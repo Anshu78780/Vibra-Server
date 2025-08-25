@@ -5,11 +5,11 @@ class Config:
     
     # Flask settings
     SECRET_KEY = os.environ.get('SECRET_KEY') or 'your-secret-key-here'
-    DEBUG = os.environ.get('FLASK_DEBUG', 'True').lower() == 'true'
+    DEBUG = os.environ.get('FLASK_DEBUG', 'False').lower() == 'true'  # Default to False for production
     
     # Server settings
     HOST = os.environ.get('FLASK_HOST', '0.0.0.0')
-    PORT = int(os.environ.get('FLASK_PORT', 5000))
+    PORT = int(os.environ.get('PORT', 5000))  # Render uses PORT environment variable
     
     # yt-dlp settings
     MAX_SEARCH_RESULTS = 50

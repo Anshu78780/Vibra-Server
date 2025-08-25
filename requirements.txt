@@ -3,3 +3,4 @@ flask-cors==4.0.0
 yt-dlp>=2023.12.30
 ytmusicapi>=1.7.0
 requests==2.31.0
+gunicorn==21.2.0

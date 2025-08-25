@@ -1,0 +1,19 @@
+services:
+  - type: web
+    name: music-backend-api
+    env: python
+    buildCommand: "./build.sh"
+    startCommand: "./start.sh"
+    plan: starter  # Can be upgraded to standard/pro as needed
+    envVars:
+      - key: FLASK_DEBUG
+        value: "False"
+      - key: FLASK_HOST
+        value: "0.0.0.0"
+      - key: LOG_LEVEL
+        value: "INFO"
+      - key: CORS_ORIGINS
+        value: "*"
+      - key: SECRET_KEY
+        generateValue: true  # Render will generate a secure secret key
+    healthCheckPath: /health

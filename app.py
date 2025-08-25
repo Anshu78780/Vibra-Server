@@ -216,11 +216,33 @@ def get_category_data(category):
 
 @app.route('/health', methods=['GET'])
 def health_check():
-    """Health check endpoint"""
-    return jsonify({
-        'status': 'healthy',
-        'timestamp': str(datetime.now())
-    })
+    """Health check endpoint with system status"""
+    try:
+        # Test YTMusic API
+        ytmusic_status = "OK" if music_extractor.ytmusic else "Unavailable"
+        
+        # Test basic functionality
+        test_search = music_extractor.search_songs("test", 1)
+        search_status = "OK" if test_search else "Error"
+        
+        return jsonify({
+            'status': 'healthy',
+            'timestamp': str(datetime.now()),
+            'services': {
+                'ytmusic_api': ytmusic_status,
+                'search_function': search_status,
+                'yt_dlp': 'OK'  # Always available if imported
+            },
+            'version': '1.0.0',
+            'environment': 'production' if not Config.DEBUG else 'development'
+        })
+    except Exception as e:
+        logger.error(f"Health check error: {str(e)}")
+        return jsonify({
+            'status': 'unhealthy',
+            'timestamp': str(datetime.now()),
+            'error': str(e)
+        }), 500
 
 @app.errorhandler(404)
 def not_found(error):
