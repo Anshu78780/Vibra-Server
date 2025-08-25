@@ -1,0 +1,22 @@
+import os
+
+class Config:
+    """Configuration class for the Flask app"""
+    
+    # Flask settings
+    SECRET_KEY = os.environ.get('SECRET_KEY') or 'your-secret-key-here'
+    DEBUG = os.environ.get('FLASK_DEBUG', 'True').lower() == 'true'
+    
+    # Server settings
+    HOST = os.environ.get('FLASK_HOST', '0.0.0.0')
+    PORT = int(os.environ.get('FLASK_PORT', 5000))
+    
+    # yt-dlp settings
+    MAX_SEARCH_RESULTS = 50
+    DEFAULT_SEARCH_RESULTS = 10
+    
+    # CORS settings
+    CORS_ORIGINS = os.environ.get('CORS_ORIGINS', '*')
+    
+    # Logging
+    LOG_LEVEL = os.environ.get('LOG_LEVEL', 'INFO')
