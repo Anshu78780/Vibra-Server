@@ -25,6 +25,7 @@ def home():
         'endpoints': {
             '/search': 'Search for songs (GET) - ?q=query&limit=10',
             '/song/<song_id>': 'Get specific song details (GET)',
+            '/audio/<video_id>': 'Get audio URL for video ID (GET)',
             '/extract': 'Extract song from URL (POST)',
             '/playlist': 'Extract songs from playlist (POST)',
             '/homepage': 'Get YouTube homepage/trending data (GET) - ?limit=20',
@@ -34,11 +35,13 @@ def home():
         'example_usage': {
             'search': '/search?q=imagine%20dragons&limit=5',
             'song': '/song/dQw4w9WgXcQ',
+            'audio': '/audio/dQw4w9WgXcQ',
             'extract': 'POST /extract with {"url": "https://youtube.com/watch?v=..."}',
             'playlist': 'POST /playlist with {"url": "https://youtube.com/playlist?list=..."}',
             'homepage': '/homepage?limit=20',
             'category': '/category/pop?limit=15'
-        }
+        },
+        'performance_note': 'Search and homepage endpoints use YTMusic API for fast metadata. Use /audio/<video_id> to get playable URLs on demand.'
     })
 
 @app.route('/search', methods=['GET'])
@@ -83,6 +86,26 @@ def get_song(song_id):
             
     except Exception as e:
         logger.error(f"Get song error: {str(e)}")
+        return jsonify({'error': 'Internal server error'}), 500
+
+@app.route('/audio/<video_id>', methods=['GET'])
+def get_audio_url(video_id):
+    """Get audio URL for a specific video ID"""
+    try:
+        audio_url = music_extractor.get_audio_url(video_id)
+        
+        if audio_url:
+            return jsonify({
+                'success': True,
+                'video_id': video_id,
+                'audio_url': audio_url,
+                'message': 'Audio URL retrieved successfully'
+            })
+        else:
+            return jsonify({'error': 'Could not get audio URL for this video'}), 404
+            
+    except Exception as e:
+        logger.error(f"Get audio URL error: {str(e)}")
         return jsonify({'error': 'Internal server error'}), 500
 
 @app.route('/extract', methods=['POST'])

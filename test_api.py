@@ -92,6 +92,7 @@ def test_homepage():
                 if trending_music:
                     first_video = trending_music[0]
                     print(f"   First video: {first_video['title']} by {first_video['artist']}")
+                    print(f"   Source: {first_video.get('source', 'unknown')}")
                 return True
             else:
                 print("❌ Homepage test failed - No data returned")
@@ -102,6 +103,32 @@ def test_homepage():
             return False
     except Exception as e:
         print(f"❌ Homepage test error: {str(e)}")
+        return False
+
+def test_audio_url():
+    """Test the audio URL endpoint"""
+    print("\nTesting audio URL endpoint...")
+    try:
+        test_video_id = "dQw4w9WgXcQ"  # Rick Roll for testing
+        response = requests.get(f"{BASE_URL}/audio/{test_video_id}")
+        
+        if response.status_code == 200:
+            data = response.json()
+            if data.get('success') and data.get('audio_url'):
+                print(f"✅ Audio URL test passed")
+                print(f"   Video ID: {data['video_id']}")
+                print(f"   Has audio URL: Yes")
+                print(f"   URL length: {len(data['audio_url'])} characters")
+                return True
+            else:
+                print("❌ Audio URL test failed - No audio URL returned")
+                return False
+        else:
+            print(f"❌ Audio URL test failed: {response.status_code}")
+            print(f"   Response: {response.text}")
+            return False
+    except Exception as e:
+        print(f"❌ Audio URL test error: {str(e)}")
         return False
 
 def test_category():
@@ -136,7 +163,7 @@ def main():
     print("🎵 Music Backend API Test Suite")
     print("=" * 40)
     
-    tests = [test_health, test_search, test_extract, test_homepage, test_category]
+    tests = [test_health, test_search, test_extract, test_homepage, test_audio_url, test_category]
     passed = 0
     
     for test in tests:

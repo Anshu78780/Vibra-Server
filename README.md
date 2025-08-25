@@ -4,12 +4,13 @@ A Flask-based backend service for a music app that provides song search, metadat
 
 ## Features
 
-- **Song Search**: Search for songs with customizable result limits
+- **Song Search**: Search for songs with customizable result limits ⚡ **Fast with YTMusic API**
 - **Metadata Extraction**: Get detailed song information including title, artist, duration, thumbnails
-- **Playable URLs**: Extract direct audio URLs for streaming
+- **Playable URLs**: Extract direct audio URLs for streaming (on-demand with yt-dlp)
 - **Poster Images**: Get high-quality thumbnail/poster images
 - **Playlist Support**: Extract songs from playlists
-- **YouTube Integration**: Powered by yt-dlp for reliable extraction
+- **YouTube Integration**: Powered by ytmusicapi for fast metadata and yt-dlp for audio URLs
+- **Performance Optimized**: Fast homepage and search using YTMusic API, audio URLs loaded on demand
 
 ## Installation
 
@@ -82,7 +83,27 @@ Get detailed information about a specific song using its YouTube ID.
 GET /song/ktvTqknDobU
 ```
 
-#### 3. Extract from URL
+#### 3. Get Audio URL
+**GET** `/audio/<video_id>`
+
+Get the direct audio URL for a specific video ID. This endpoint uses yt-dlp to extract the playable audio URL on demand.
+
+**Example:**
+```
+GET /audio/ktvTqknDobU
+```
+
+**Response:**
+```json
+{
+  "success": true,
+  "video_id": "ktvTqknDobU",
+  "audio_url": "https://rr3---sn-4g5ednek.googlevideo.com/videoplayback?...",
+  "message": "Audio URL retrieved successfully"
+}
+```
+
+#### 4. Extract from URL
 **POST** `/extract`
 
 Extract song details from a YouTube URL.
@@ -94,7 +115,7 @@ Extract song details from a YouTube URL.
 }
 ```
 
-#### 4. Extract Playlist
+#### 5. Extract Playlist
 **POST** `/playlist`
 
 Extract songs from a YouTube playlist.
@@ -107,10 +128,10 @@ Extract songs from a YouTube playlist.
 }
 ```
 
-#### 5. Get YouTube Homepage Data
+#### 6. Get YouTube Homepage Data ⚡ **Fast**
 **GET** `/homepage`
 
-Get YouTube homepage/trending music data.
+Get YouTube homepage/trending music data using YTMusic API for fast responses. Audio URLs are not included - use `/audio/<video_id>` to get them on demand.
 
 **Parameters:**
 - `limit` (optional): Number of results (default: 20, max: 50)
@@ -133,11 +154,12 @@ GET /homepage?limit=15
         "duration": 187,
         "duration_string": "03:07",
         "thumbnail": "https://i.ytimg.com/vi/ktvTqknDobU/maxresdefault.jpg",
-        "audio_url": "https://...",
-        "category": "trending"
+        "audio_url": null,
+        "category": "trending",
+        "source": "ytmusicapi"
       }
     ],
-    "categories": ["trending", "popular", "top_hits"],
+    "categories": ["trending", "charts", "new_releases"],
     "last_updated": "now",
     "total_results": 15
   },
@@ -145,10 +167,10 @@ GET /homepage?limit=15
 }
 ```
 
-#### 6. Get Category Videos
+#### 7. Get Category Videos ⚡ **Fast**
 **GET** `/category/<category>`
 
-Get videos by music category.
+Get videos by music category using YTMusic API for fast responses.
 
 **Parameters:**
 - `limit` (optional): Number of results (default: 20, max: 50)
@@ -185,16 +207,32 @@ GET /category/pop?limit=10
       "duration": 200,
       "duration_string": "03:20",
       "thumbnail": "https://...",
-      "audio_url": "https://..."
+      "audio_url": null,
+      "source": "ytmusicapi"
     }
   ]
 }
 ```
 
-#### 7. Health Check
+#### 8. Health Check
 **GET** `/health`
 
 Check if the server is running.
+
+## Performance Optimization 🚀
+
+This backend is optimized for speed:
+
+- **Fast Metadata**: Uses `ytmusicapi` for lightning-fast search, homepage, and category data
+- **On-Demand Audio**: Audio URLs are fetched only when needed using `yt-dlp`
+- **Efficient Flow**: Browse content quickly, load audio streams when ready to play
+- **Fallback Support**: Automatically falls back to yt-dlp if ytmusicapi is unavailable
+
+### Recommended Usage Pattern:
+
+1. **Browse**: Use `/search`, `/homepage`, `/category` for fast browsing
+2. **Select**: User picks a song from the fast results
+3. **Play**: Call `/audio/<video_id>` to get the playable URL when ready to play
 
 ## Configuration
 
@@ -250,20 +288,24 @@ This backend is designed to work with music player frontends. The `audio_url` fi
 
 **Example Frontend Usage:**
 ```javascript
-// Search for songs
+// Fast search for songs (metadata only)
 const response = await fetch('/search?q=favorite%20song&limit=10');
 const data = await response.json();
 
-// Get homepage/trending data
+// Fast homepage/trending data (metadata only)
 const homepageResponse = await fetch('/homepage?limit=20');
 const homepageData = await homepageResponse.json();
 
-// Get pop music videos
+// Fast category videos (metadata only)
 const categoryResponse = await fetch('/category/pop?limit=15');
 const categoryData = await categoryResponse.json();
 
-// Play a song
-const audio = new Audio(data.songs[0].audio_url);
+// Get audio URL when ready to play (slower, on-demand)
+const audioResponse = await fetch(`/audio/${data.songs[0].id}`);
+const audioData = await audioResponse.json();
+
+// Play the song
+const audio = new Audio(audioData.audio_url);
 audio.play();
 ```
 
@@ -280,7 +322,8 @@ The API includes comprehensive error handling:
 
 - Flask: Web framework
 - flask-cors: CORS support
-- yt-dlp: YouTube extraction
+- yt-dlp: YouTube audio extraction (used for audio URLs)
+- ytmusicapi: Fast YouTube Music metadata (used for search, homepage, categories)
 - requests: HTTP requests
 
 ## Notes
