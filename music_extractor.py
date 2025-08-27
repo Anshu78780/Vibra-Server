@@ -1,5 +1,7 @@
 import yt_dlp
 import logging
+import os
+import tempfile
 from ytmusicapi import YTMusic
 
 logger = logging.getLogger(__name__)
@@ -45,13 +47,48 @@ class MusicExtractor:
                     'player_skip': ['configs'],
                 }
             },
-            # Use cookies from browser if available
-            'cookiesfrombrowser': ('chrome',),  # Try to get cookies from Chrome
+            # Use cookies for authentication (for Render deployment)
+            'cookiefile': None,  # Will be set dynamically if needed
             # Fallback options
             'sleep_interval': 1,
             'max_sleep_interval': 5,
             'sleep_interval_subtitles': 1,
         }
+        
+        # Set up cookies for YouTube authentication if available
+        self._setup_cookies()
+    
+    def _setup_cookies(self):
+        """Set up cookies for YouTube authentication to avoid bot detection"""
+        try:
+            # Get cookies from environment variable (for Render deployment)
+            cookies_string = os.environ.get('YOUTUBE_COOKIES')
+            
+            if cookies_string:
+                # Create a temporary cookie file
+                temp_dir = tempfile.gettempdir()
+                cookie_file = os.path.join(temp_dir, 'youtube_cookies.txt')
+                
+                # Write cookies in Netscape format
+                with open(cookie_file, 'w') as f:
+                    f.write("# Netscape HTTP Cookie File\n")
+                    f.write("# This is a generated file! Do not edit.\n\n")
+                    
+                    # Parse the cookie string and convert to Netscape format
+                    for cookie in cookies_string.split('; '):
+                        if '=' in cookie:
+                            name, value = cookie.split('=', 1)
+                            # Write in Netscape format: domain, domain_specified, path, secure, expiration, name, value
+                            f.write(f".youtube.com\tTRUE\t/\tFALSE\t0\t{name}\t{value}\n")
+                
+                # Update ydl_opts to use the cookie file
+                self.ydl_opts['cookiefile'] = cookie_file
+                logger.info("YouTube cookies loaded successfully")
+            else:
+                logger.info("No YouTube cookies found in environment variables")
+                
+        except Exception as e:
+            logger.warning(f"Failed to set up cookies: {str(e)}")
     
     def search_songs(self, query, max_results=10):
         """Search for songs using ytmusicapi (fast metadata) and yt-dlp (audio URLs when needed)"""

@@ -1,9 +1,18 @@
 from flask import Flask, request, jsonify
 from flask_cors import CORS
 import logging
+import os
 from datetime import datetime
 from config import Config
 from music_extractor import MusicExtractor
+
+# Load environment variables from .env file for local development
+try:
+    from dotenv import load_dotenv
+    load_dotenv()
+except ImportError:
+    # dotenv not installed, skip loading .env file
+    pass
 
 app = Flask(__name__)
 app.config.from_object(Config)

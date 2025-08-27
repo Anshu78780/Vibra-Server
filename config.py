@@ -15,6 +15,9 @@ class Config:
     MAX_SEARCH_RESULTS = 50
     DEFAULT_SEARCH_RESULTS = 10
     
+    # YouTube authentication (for avoiding bot detection)
+    YOUTUBE_COOKIES = os.environ.get('YOUTUBE_COOKIES')
+    
     # CORS settings
     CORS_ORIGINS = os.environ.get('CORS_ORIGINS', '*')
     
