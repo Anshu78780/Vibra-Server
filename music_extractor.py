@@ -28,6 +28,29 @@ class MusicExtractor:
             'logtostderr': False,
             'quiet': True,
             'no_color': True,
+            # Add headers to avoid bot detection
+            'http_headers': {
+                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36',
+                'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
+                'Accept-Language': 'en-us,en;q=0.5',
+                'Accept-Encoding': 'gzip,deflate',
+                'Accept-Charset': 'ISO-8859-1,utf-8;q=0.7,*;q=0.7',
+                'Keep-Alive': '300',
+                'Connection': 'keep-alive',
+            },
+            # Additional options to bypass bot detection
+            'extractor_args': {
+                'youtube': {
+                    'skip': ['dash', 'hls'],
+                    'player_skip': ['configs'],
+                }
+            },
+            # Use cookies from browser if available
+            'cookiesfrombrowser': ('chrome',),  # Try to get cookies from Chrome
+            # Fallback options
+            'sleep_interval': 1,
+            'max_sleep_interval': 5,
+            'sleep_interval_subtitles': 1,
         }
     
     def search_songs(self, query, max_results=10):
@@ -126,12 +149,93 @@ class MusicExtractor:
     def get_song_details(self, url):
         """Get detailed information about a specific song"""
         try:
+            # Extract video ID from URL
+            video_id = self._extract_video_id_from_url(url)
+            
+            # Try YTMusic API first to avoid bot detection
+            if self.ytmusic and video_id:
+                try:
+                    # Search for the song using YTMusic API
+                    search_results = self.ytmusic.search(video_id, filter="songs", limit=1)
+                    if search_results:
+                        song_info = self._convert_ytmusic_to_standard(search_results[0])
+                        if song_info and song_info['id'] == video_id:
+                            logger.info(f"Found song details using YTMusic API for {video_id}")
+                            return song_info
+                except Exception as e:
+                    logger.warning(f"YTMusic API failed for {video_id}: {str(e)}")
+            
+            # Fallback to yt-dlp with enhanced configuration
+            logger.info(f"Falling back to yt-dlp for {video_id}")
             with yt_dlp.YoutubeDL(self.ydl_opts) as ydl:
                 info = ydl.extract_info(url, download=False)
                 return self.extract_song_metadata(info)
                 
         except Exception as e:
             logger.error(f"Error getting song details: {str(e)}")
+            # Try one more time with minimal options if bot detection occurs
+            if "Sign in to confirm" in str(e) or "bot" in str(e).lower():
+                return self._get_song_details_minimal(url)
+            return None
+    
+    def _extract_video_id_from_url(self, url):
+        """Extract video ID from YouTube URL"""
+        try:
+            import re
+            # Match various YouTube URL formats
+            patterns = [
+                r'(?:youtube\.com/watch\?v=|youtu\.be/)([a-zA-Z0-9_-]{11})',
+                r'youtube\.com/embed/([a-zA-Z0-9_-]{11})',
+                r'youtube\.com/v/([a-zA-Z0-9_-]{11})'
+            ]
+            
+            for pattern in patterns:
+                match = re.search(pattern, url)
+                if match:
+                    return match.group(1)
+            return None
+        except Exception as e:
+            logger.warning(f"Could not extract video ID from URL {url}: {str(e)}")
+            return None
+    
+    def _get_song_details_minimal(self, url):
+        """Minimal extraction when bot detection occurs"""
+        try:
+            # Try with minimal options to avoid bot detection
+            minimal_opts = {
+                'quiet': True,
+                'no_warnings': True,
+                'format': 'worst',  # Use worst quality to be less suspicious
+                'http_headers': {
+                    'User-Agent': 'Mozilla/5.0 (compatible; Googlebot/2.1; +http://www.google.com/bot.html)'
+                }
+            }
+            
+            with yt_dlp.YoutubeDL(minimal_opts) as ydl:
+                info = ydl.extract_info(url, download=False)
+                # Return basic info without audio URL
+                return {
+                    'id': info.get('id'),
+                    'title': info.get('title', 'Unknown Title'),
+                    'artist': info.get('uploader', 'Unknown Artist'),
+                    'duration': info.get('duration'),
+                    'duration_string': self.format_duration(info.get('duration')),
+                    'thumbnail': info.get('thumbnail'),
+                    'poster_image': info.get('thumbnail'),
+                    'audio_url': None,  # Skip audio URL due to bot detection
+                    'webpage_url': info.get('webpage_url'),
+                    'view_count': info.get('view_count'),
+                    'like_count': info.get('like_count'),
+                    'uploader': info.get('uploader'),
+                    'upload_date': info.get('upload_date'),
+                    'description': info.get('description', '')[:500] if info.get('description') else '',
+                    'extractor': info.get('extractor', 'youtube'),
+                    'availability': info.get('availability'),
+                    'live_status': info.get('live_status'),
+                    'source': 'yt-dlp-minimal'
+                }
+        except Exception as e:
+            logger.error(f"Minimal extraction also failed: {str(e)}")
             return None
     
     def get_audio_url(self, video_id):
@@ -139,6 +243,7 @@ class MusicExtractor:
         try:
             url = f"https://www.youtube.com/watch?v={video_id}"
             
+            # Try with enhanced configuration first
             with yt_dlp.YoutubeDL(self.ydl_opts) as ydl:
                 info = ydl.extract_info(url, download=False)
                 
@@ -158,7 +263,46 @@ class MusicExtractor:
                 
         except Exception as e:
             logger.error(f"Error getting audio URL for {video_id}: {str(e)}")
+            
+            # Try fallback method if bot detection occurs
+            if "Sign in to confirm" in str(e) or "bot" in str(e).lower():
+                return self._get_audio_url_fallback(video_id)
+                
             return None
+    
+    def _get_audio_url_fallback(self, video_id):
+        """Fallback method for audio URL extraction when bot detection occurs"""
+        try:
+            logger.info(f"Attempting fallback audio extraction for {video_id}...")
+            url = f"https://www.youtube.com/watch?v={video_id}"
+            
+            # Try with very minimal options
+            fallback_opts = {
+                'quiet': True,
+                'no_warnings': True,
+                'format': 'worstaudio/worst',  # Use worst quality to avoid suspicion
+                'http_headers': {
+                    'User-Agent': 'Mozilla/5.0 (compatible; Googlebot/2.1; +http://www.google.com/bot.html)',
+                    'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
+                    'Accept-Language': 'en-us,en;q=0.5'
+                }
+            }
+            
+            with yt_dlp.YoutubeDL(fallback_opts) as ydl:
+                info = ydl.extract_info(url, download=False)
+                
+                if 'url' in info:
+                    return info['url']
+                elif 'formats' in info:
+                    # Get any working format
+                    for format_item in info['formats']:
+                        if format_item.get('url'):
+                            return format_item['url']
+                    
+        except Exception as e:
+            logger.error(f"Fallback audio extraction also failed for {video_id}: {str(e)}")
+            
+        return None
     
     def extract_song_metadata(self, entry):
         """Extract relevant metadata from yt-dlp entry"""
