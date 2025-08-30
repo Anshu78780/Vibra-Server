@@ -357,7 +357,7 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 
 - 🐛 **Issues:** [GitHub Issues](https://github.com/Anshu78780/Vibra-Server/issues)
 - 💬 **Discussions:** [GitHub Discussions](https://github.com/Anshu78780/Vibra-Server/discussions)
-- 📧 **Email:** [Your Email]
+- 📧 **Email:** anshudubey20000002@gmail.com
 
 ## 🚀 Roadmap
 
