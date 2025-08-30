@@ -17,28 +17,74 @@ A powerful, fast, and free music API that provides access to YouTube Music data,
 - 🌍 **Global Support** - Multi-country support with localized trending content
 - ⚡ **High Performance** - Optimized with dual extraction methods (YTMusicAPI + yt-dlp)
 - 🔧 **Easy Integration** - Simple REST API with JSON responses
-- 🚀 **Production Ready** - Includes gunicorn, logging, error handling, and health checks
+- � **Android Support** - Run natively on Android devices using Termux
+- �🚀 **Production Ready** - Includes gunicorn, logging, error handling, and health checks
 
 ## 🚀 Quick Start
 
-### 1. Clone the Repository
+### 📱 Option 1: Run on Android (Termux) - Recommended
 
-```bash
-git clone https://github.com/Anshu78780/Vibra-Server.git
-cd Vibra-Server
-```
+Perfect for running the API server directly on your Android device!
 
-### 2. Install Dependencies
+1. **Install Termux** from [F-Droid](https://f-droid.org/en/packages/com.termux/) or [GitHub](https://github.com/termux/termux-app/releases)
 
-```bash
-pip install -r requirements.txt
-```
+2. **Update Termux packages**:
+   ```bash
+   pkg update && pkg upgrade
+   ```
 
-### 3. Run the Application
+3. **Install required packages**:
+   ```bash
+   pkg install python git ffmpeg
+   ```
 
-```bash
-python app.py
-```
+4. **Install pip packages**:
+   ```bash
+   pip install --upgrade pip
+   ```
+
+5. **Clone and setup the project**:
+   ```bash
+   git clone https://github.com/Anshu78780/Vibra-Server.git
+   cd Vibra-Server
+   pip install -r requirements.txt
+   ```
+
+6. **Run the server**:
+   ```bash
+   python app.py
+   ```
+
+7. **Access your API**:
+   - Local access: `http://localhost:5000`
+   - Network access: `http://YOUR_PHONE_IP:5000`
+   - To find your IP: `ifconfig` or check WiFi settings
+
+**Termux Tips:**
+- Keep Termux running in background for 24/7 server
+- Use `termux-wake-lock` to prevent sleep
+- Install `termux-api` for additional Android integration
+- Use `pkg install openssh` for remote access
+
+### 💻 Option 2: Run on Desktop/Laptop
+
+#### Windows/Mac/Linux
+
+1. **Clone the Repository**:
+   ```bash
+   git clone https://github.com/Anshu78780/Vibra-Server.git
+   cd Vibra-Server
+   ```
+
+2. **Install Dependencies**:
+   ```bash
+   pip install -r requirements.txt
+   ```
+
+3. **Run the Application**:
+   ```bash
+   python app.py
+   ```
 
 The API will be available at `http://localhost:5000`
 
@@ -205,6 +251,132 @@ services:
       - FLASK_DEBUG=false
       - PORT=5000
 ```
+
+## 📱 Android Termux Deployment (Advanced)
+
+### Auto-Start Server on Boot
+
+1. **Create startup script**:
+   ```bash
+   nano ~/start-vibra-server.sh
+   ```
+
+2. **Add script content**:
+   ```bash
+   #!/data/data/com.termux/files/usr/bin/bash
+   cd ~/Vibra-Server
+   python app.py
+   ```
+
+3. **Make executable**:
+   ```bash
+   chmod +x ~/start-vibra-server.sh
+   ```
+
+4. **Create Termux boot script** (requires Termux:Boot app):
+   ```bash
+   mkdir -p ~/.termux/boot
+   echo "~/start-vibra-server.sh" > ~/.termux/boot/start-server
+   chmod +x ~/.termux/boot/start-server
+   ```
+
+### Network Access Configuration
+
+**Allow external connections**:
+```bash
+# Edit config to allow network access
+nano ~/Vibra-Server/config.py
+# Set FLASK_HOST = '0.0.0.0'
+```
+
+**Find your phone's IP**:
+```bash
+# Method 1
+ifconfig wlan0 | grep inet
+
+# Method 2  
+ip route | grep wlan0
+```
+
+**Port forwarding with SSH** (optional):
+```bash
+# Install openssh
+pkg install openssh
+
+# Start SSH daemon
+sshd
+
+# From another device, forward port
+ssh -L 5000:localhost:5000 user@PHONE_IP
+```
+
+### Performance Optimization
+
+**Keep server running in background**:
+```bash
+# Install tmux for session management
+pkg install tmux
+
+# Start server in tmux session
+tmux new-session -d -s vibra-server
+tmux send-keys -t vibra-server "cd ~/Vibra-Server && python app.py" Enter
+
+# Detach and keep running
+tmux detach -s vibra-server
+
+# Reattach later
+tmux attach -s vibra-server
+```
+
+**Prevent sleep/battery optimization**:
+```bash
+# Install termux-api
+pkg install termux-api
+
+# Acquire wake lock
+termux-wake-lock
+
+# Check battery optimization settings in Android
+```
+
+### Termux Troubleshooting
+
+**Common Issues:**
+
+1. **Python package installation fails**:
+   ```bash
+   pkg install clang python-dev libffi-dev openssl-dev
+   pip install --upgrade setuptools wheel
+   ```
+
+2. **FFmpeg not found**:
+   ```bash
+   pkg install ffmpeg
+   # Verify installation
+   ffmpeg -version
+   ```
+
+3. **Permission denied errors**:
+   ```bash
+   # Fix permissions
+   chmod -R 755 ~/Vibra-Server
+   ```
+
+4. **Memory issues on low-end devices**:
+   ```bash
+   # Reduce worker processes
+   export WORKERS=1
+   python app.py
+   ```
+
+5. **Network not accessible from other devices**:
+   ```bash
+   # Check if port is open
+   netstat -tlnp | grep :5000
+   
+   # Allow in Android firewall (if any)
+   # Check router settings for device isolation
+   ```
 
 ## ☁️ Deploy to Cloud
 
