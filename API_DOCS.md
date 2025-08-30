@@ -310,6 +310,6 @@ const { audio_url } = await audioResponse.json();
 ## Support
 
 - 📧 Email: support@example.com
-- 🐛 Issues: [GitHub Issues](https://github.com/Anshu78780/Song/issues)
+- 🐛 Issues: [GitHub Issues](https://github.com/Anshu78780/Vibra-Server/issues)
 - 💬 Discord: [Join our Discord](https://discord.gg/example)
 - 📖 Documentation: [Full Documentation](https://docs.example.com)

@@ -1,4 +1,4 @@
-# 🎵 Music Backend API
+# 🎵 Vibra Server - Music Backend API
 
 A powerful, fast, and free music API that provides access to YouTube Music data, trending songs, playlists, recommendations, and audio streaming URLs. Built with Flask, YTMusicAPI, and yt-dlp.
 
@@ -24,8 +24,8 @@ A powerful, fast, and free music API that provides access to YouTube Music data,
 ### 1. Clone the Repository
 
 ```bash
-git clone https://github.com/Anshu78780/Song.git
-cd Song
+git clone https://github.com/Anshu78780/Vibra-Server.git
+cd Vibra-Server
 ```
 
 ### 2. Install Dependencies
@@ -285,7 +285,7 @@ curl "http://localhost:5000/recommended/ktvTqknDobU?limit=10"
 ## 🏗️ Project Structure
 
 ```
-Song/
+Vibra-Server/
 ├── app.py                 # Main Flask application
 ├── config.py             # Configuration settings
 ├── music_extractor.py    # Core music extraction logic
@@ -355,8 +355,8 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 
 ## 📞 Support
 
-- 🐛 **Issues:** [GitHub Issues](https://github.com/Anshu78780/Song/issues)
-- 💬 **Discussions:** [GitHub Discussions](https://github.com/Anshu78780/Song/discussions)
+- 🐛 **Issues:** [GitHub Issues](https://github.com/Anshu78780/Vibra-Server/issues)
+- 💬 **Discussions:** [GitHub Discussions](https://github.com/Anshu78780/Vibra-Server/discussions)
 - 📧 **Email:** [Your Email]
 
 ## 🚀 Roadmap

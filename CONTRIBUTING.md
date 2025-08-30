@@ -49,8 +49,8 @@ Enhancement suggestions are tracked as GitHub issues. When creating an enhanceme
 
 1. **Fork and clone the repository**
    ```bash
-   git clone https://github.com/yourusername/Song.git
-   cd Song
+   git clone https://github.com/yourusername/Vibra-Server.git
+   cd Vibra-Server
    ```
 
 2. **Create a virtual environment**
@@ -130,7 +130,7 @@ def search_songs(self, query: str, max_results: int = 10) -> List[Dict]:
 ## Project Structure
 
 ```
-Song/
+Vibra-Server/
 ├── app.py                 # Main Flask application
 ├── config.py             # Configuration settings  
 ├── music_extractor.py    # Core music extraction logic
