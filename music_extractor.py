@@ -183,96 +183,23 @@ class MusicExtractor:
             logger.error(f"Error converting YTMusic result: {str(e)}")
             return None
     
-    def get_song_details(self, url):
-        """Get detailed information about a specific song"""
-        try:
-            # Extract video ID from URL
-            video_id = self._extract_video_id_from_url(url)
-            
-            # Try YTMusic API first to avoid bot detection
-            if self.ytmusic and video_id:
-                try:
-                    # Search for the song using YTMusic API
-                    search_results = self.ytmusic.search(video_id, filter="songs", limit=1)
-                    if search_results:
-                        song_info = self._convert_ytmusic_to_standard(search_results[0])
-                        if song_info and song_info['id'] == video_id:
-                            logger.info(f"Found song details using YTMusic API for {video_id}")
-                            return song_info
-                except Exception as e:
-                    logger.warning(f"YTMusic API failed for {video_id}: {str(e)}")
-            
-            # Fallback to yt-dlp with enhanced configuration
-            logger.info(f"Falling back to yt-dlp for {video_id}")
-            with yt_dlp.YoutubeDL(self.ydl_opts) as ydl:
-                info = ydl.extract_info(url, download=False)
-                return self.extract_song_metadata(info)
-                
-        except Exception as e:
-            logger.error(f"Error getting song details: {str(e)}")
-            # Try one more time with minimal options if bot detection occurs
-            if "Sign in to confirm" in str(e) or "bot" in str(e).lower():
-                return self._get_song_details_minimal(url)
-            return None
-    
-    def _extract_video_id_from_url(self, url):
-        """Extract video ID from YouTube URL"""
+    def _extract_playlist_id_from_url(self, url):
+        """Extract playlist ID from YouTube URL"""
         try:
             import re
-            # Match various YouTube URL formats
-            patterns = [
-                r'(?:youtube\.com/watch\?v=|youtu\.be/)([a-zA-Z0-9_-]{11})',
-                r'youtube\.com/embed/([a-zA-Z0-9_-]{11})',
-                r'youtube\.com/v/([a-zA-Z0-9_-]{11})'
-            ]
+            # Match YouTube playlist URL format
+            pattern = r'(?:youtube\.com|music\.youtube\.com)/playlist\?list=([a-zA-Z0-9_-]+)'
+            match = re.search(pattern, url)
+            if match:
+                return match.group(1)
             
-            for pattern in patterns:
-                match = re.search(pattern, url)
-                if match:
-                    return match.group(1)
+            # Match playlist ID directly
+            if re.match(r'^[a-zA-Z0-9_-]+$', url) and len(url) > 11:  # Most video IDs are 11 chars
+                return url
+                
             return None
         except Exception as e:
-            logger.warning(f"Could not extract video ID from URL {url}: {str(e)}")
-            return None
-    
-    def _get_song_details_minimal(self, url):
-        """Minimal extraction when bot detection occurs"""
-        try:
-            # Try with minimal options to avoid bot detection
-            minimal_opts = {
-                'quiet': True,
-                'no_warnings': True,
-                'format': 'worst',  # Use worst quality to be less suspicious
-                'http_headers': {
-                    'User-Agent': 'Mozilla/5.0 (compatible; Googlebot/2.1; +http://www.google.com/bot.html)'
-                }
-            }
-            
-            with yt_dlp.YoutubeDL(minimal_opts) as ydl:
-                info = ydl.extract_info(url, download=False)
-                # Return basic info without audio URL
-                return {
-                    'id': info.get('id'),
-                    'title': info.get('title', 'Unknown Title'),
-                    'artist': info.get('uploader', 'Unknown Artist'),
-                    'duration': info.get('duration'),
-                    'duration_string': self.format_duration(info.get('duration')),
-                    'thumbnail': info.get('thumbnail'),
-                    'poster_image': info.get('thumbnail'),
-                    'audio_url': None,  # Skip audio URL due to bot detection
-                    'webpage_url': info.get('webpage_url'),
-                    'view_count': info.get('view_count'),
-                    'like_count': info.get('like_count'),
-                    'uploader': info.get('uploader'),
-                    'upload_date': info.get('upload_date'),
-                    'description': info.get('description', '')[:500] if info.get('description') else '',
-                    'extractor': info.get('extractor', 'youtube'),
-                    'availability': info.get('availability'),
-                    'live_status': info.get('live_status'),
-                    'source': 'yt-dlp-minimal'
-                }
-        except Exception as e:
-            logger.error(f"Minimal extraction also failed: {str(e)}")
+            logger.warning(f"Could not extract playlist ID from URL {url}: {str(e)}")
             return None
     
     def get_audio_url(self, video_id):
@@ -341,65 +268,6 @@ class MusicExtractor:
             
         return None
     
-    def extract_song_metadata(self, entry):
-        """Extract relevant metadata from yt-dlp entry"""
-        # Get the best audio format
-        audio_url = None
-        if 'url' in entry:
-            audio_url = entry['url']
-        elif 'formats' in entry:
-            # Find the best audio format
-            audio_formats = [f for f in entry['formats'] if f.get('acodec') != 'none']
-            if audio_formats:
-                # Sort by quality and get the best one
-                audio_formats.sort(key=lambda x: x.get('quality', 0) or 0, reverse=True)
-                audio_url = audio_formats[0]['url']
-        
-        # Extract artist and title from title
-        title = entry.get('title', 'Unknown Title')
-        artist = entry.get('uploader', 'Unknown Artist')
-        
-        # Try to parse artist and title from title field
-        if ' - ' in title:
-            parts = title.split(' - ', 1)
-            artist = parts[0].strip()
-            title = parts[1].strip()
-        elif 'by' in title.lower():
-            # Handle cases like "Song Title by Artist"
-            parts = title.lower().split(' by ')
-            if len(parts) == 2:
-                title = parts[0].strip().title()
-                artist = parts[1].strip().title()
-        
-        # Get thumbnail/poster image
-        thumbnail = entry.get('thumbnail')
-        if not thumbnail and 'thumbnails' in entry and entry['thumbnails']:
-            # Get the highest quality thumbnail
-            thumbnails = entry['thumbnails']
-            # Sort by resolution and get the best one
-            thumbnails.sort(key=lambda x: (x.get('width', 0) or 0) * (x.get('height', 0) or 0), reverse=True)
-            thumbnail = thumbnails[0]['url'] if thumbnails else None
-        
-        return {
-            'id': entry.get('id'),
-            'title': title,
-            'artist': artist,
-            'duration': entry.get('duration'),
-            'duration_string': self.format_duration(entry.get('duration')),
-            'thumbnail': thumbnail,
-            'poster_image': thumbnail,  # Same as thumbnail for compatibility
-            'audio_url': audio_url,
-            'webpage_url': entry.get('webpage_url'),
-            'view_count': entry.get('view_count'),
-            'like_count': entry.get('like_count'),
-            'uploader': entry.get('uploader'),
-            'upload_date': entry.get('upload_date'),
-            'description': entry.get('description', '')[:500] if entry.get('description') else '',  # Truncate description
-            'extractor': entry.get('extractor', 'youtube'),
-            'availability': entry.get('availability'),
-            'live_status': entry.get('live_status'),
-        }
-    
     def format_duration(self, duration):
         """Format duration from seconds to MM:SS or HH:MM:SS"""
         if not duration:
@@ -419,7 +287,7 @@ class MusicExtractor:
             return "Unknown"
     
     def get_playlist_info(self, playlist_url, max_results=50):
-        """Extract songs from a playlist"""
+        """Extract songs from a playlist using yt-dlp"""
         try:
             ydl_opts = self.ydl_opts.copy()
             ydl_opts['playlistend'] = max_results
@@ -447,6 +315,187 @@ class MusicExtractor:
                 
         except Exception as e:
             logger.error(f"Error getting playlist info: {str(e)}")
+            return None
+            
+    def get_ytmusic_playlist(self, playlist_id, max_results=50):
+        """Get playlist information using ytmusicapi"""
+        try:
+            if not self.ytmusic:
+                logger.warning("YTMusic API not available, falling back to yt-dlp")
+                playlist_url = f"https://music.youtube.com/playlist?list={playlist_id}"
+                return self.get_playlist_info(playlist_url, max_results)
+            
+            # Get playlist information from YTMusic API
+            playlist_data = self.ytmusic.get_playlist(playlist_id, max_results)
+            
+            if not playlist_data or 'tracks' not in playlist_data:
+                logger.warning(f"No playlist data found for ID: {playlist_id}")
+                return None
+            
+            # Process tracks
+            songs = []
+            for track in playlist_data.get('tracks', [])[:max_results]:
+                song_info = self._convert_ytmusic_to_standard(track)
+                if song_info:
+                    songs.append(song_info)
+            
+            # Return formatted playlist information
+            return {
+                'title': playlist_data.get('title', 'Unknown Playlist'),
+                'id': playlist_id,
+                'uploader': playlist_data.get('author', {}).get('name', 'Unknown'),
+                'description': playlist_data.get('description', ''),
+                'thumbnail': playlist_data.get('thumbnails', [{}])[-1].get('url') if playlist_data.get('thumbnails') else None,
+                'year': playlist_data.get('year'),
+                'total_tracks': playlist_data.get('trackCount', len(songs)),
+                'entry_count': len(songs),
+                'songs': songs,
+                'source': 'ytmusicapi'
+            }
+                
+        except Exception as e:
+            logger.error(f"Error getting playlist info with YTMusic API: {str(e)}")
+            # Fallback to traditional method if YTMusic API fails
+            playlist_url = f"https://music.youtube.com/playlist?list={playlist_id}"
+            return self.get_playlist_info(playlist_url, max_results)
+            
+    def get_trending_by_country(self, country_code='US', max_results=50):
+        """Get trending playlists by country using ytmusicapi"""
+        try:
+            if not self.ytmusic:
+                logger.warning("YTMusic API not available, cannot fetch trending playlists")
+                return None
+            
+            # Get the home page data which includes trending playlists
+            home_data = self.ytmusic.get_home(limit=100)  # Get more data
+            
+            if not home_data:
+                logger.warning("No home data available")
+                return None
+            
+            # Extract playlists from home data
+            trending_playlists = []
+            
+            # Process each section in home data
+            for section in home_data:
+                if isinstance(section, dict) and 'contents' in section:
+                    section_title = section.get('title', 'Unknown Section')
+                    contents = section.get('contents', [])
+                    
+                    # Process each item in the section
+                    for item in contents:
+                        if item and isinstance(item, dict) and 'playlistId' in item:
+                            playlist_info = {
+                                'title': item.get('title', 'Unknown Playlist'),
+                                'playlistId': item.get('playlistId'),
+                                'thumbnail': item.get('thumbnails', [{}])[-1].get('url') if item.get('thumbnails') else None,
+                                'description': item.get('description', ''),
+                                'section': section_title,
+                                'url': f"https://music.youtube.com/playlist?list={item.get('playlistId')}" if item.get('playlistId') else None
+                            }
+                            trending_playlists.append(playlist_info)
+                            
+                            if len(trending_playlists) >= max_results:
+                                break
+                
+                if len(trending_playlists) >= max_results:
+                    break
+            
+            # If we still don't have enough playlists, try search method
+            if len(trending_playlists) < 20:
+                try:
+                    # Search for popular playlist terms
+                    search_terms = [
+                        'hindi hits', 'bollywood hits', 'punjabi hits', 'tamil hits',
+                        'trending songs', 'top hits', 'viral songs', 'chart toppers',
+                        'latest songs', 'popular music'
+                    ]
+                    
+                    for search_term in search_terms:
+                        if len(trending_playlists) >= max_results:
+                            break
+                            
+                        try:
+                            search_results = self.ytmusic.search(search_term, filter='playlists', limit=10)
+                            
+                            for result in search_results:
+                                if result and isinstance(result, dict):
+                                    # For search results, we need to construct playlist info differently
+                                    playlist_info = {
+                                        'title': result.get('title', 'Unknown Playlist'),
+                                        'playlistId': result.get('browseId', '').replace('VL', '') if result.get('browseId', '').startswith('VL') else result.get('browseId'),
+                                        'thumbnail': result.get('thumbnails', [{}])[-1].get('url') if result.get('thumbnails') else None,
+                                        'description': result.get('description', ''),
+                                        'author': result.get('author', 'Unknown'),
+                                        'videoCount': result.get('count'),
+                                        'section': f'Search: {search_term}',
+                                        'url': f"https://music.youtube.com/playlist?list={result.get('browseId', '').replace('VL', '') if result.get('browseId', '').startswith('VL') else result.get('browseId')}" if result.get('browseId') else None
+                                    }
+                                    
+                                    # Only add if we have a valid playlist ID
+                                    if playlist_info['playlistId']:
+                                        trending_playlists.append(playlist_info)
+                                        
+                                        if len(trending_playlists) >= max_results:
+                                            break
+                        except Exception as search_error:
+                            logger.warning(f"Error searching for '{search_term}': {str(search_error)}")
+                            continue
+                            
+                except Exception as search_error:
+                    logger.warning(f"Error in playlist search fallback: {str(search_error)}")
+            
+            # Structure to hold playlist data
+            result = {
+                'country': country_code,
+                'trending_playlists': trending_playlists[:max_results],
+                'total_playlists': len(trending_playlists),
+                'source': 'ytmusicapi'
+            }
+            
+            logger.info(f"Found {len(trending_playlists)} playlists for country {country_code}")
+            
+            return result
+                
+        except Exception as e:
+            logger.error(f"Error getting trending playlists: {str(e)}")
+            import traceback
+            logger.error(traceback.format_exc())
+            return None
+    
+    def get_recommended_songs(self, video_id, max_results=50):
+        """Get recommended songs for a specific video using ytmusicapi"""
+        try:
+            if not self.ytmusic:
+                logger.warning("YTMusic API not available, cannot fetch recommendations")
+                return None
+            
+            # Get the recommended songs (watch next) for a specific video
+            recommended_data = self.ytmusic.get_watch_playlist(videoId=video_id, limit=max_results)
+            
+            if not recommended_data or 'tracks' not in recommended_data:
+                logger.warning(f"No recommendations found for video ID: {video_id}")
+                return None
+            
+            # Process recommended tracks
+            recommendations = []
+            for track in recommended_data.get('tracks', [])[:max_results]:
+                song_info = self._convert_ytmusic_to_standard(track)
+                if song_info:
+                    recommendations.append(song_info)
+            
+            # Return formatted recommendations
+            return {
+                'video_id': video_id,
+                'recommendations_count': len(recommendations),
+                'recommendations': recommendations,
+                'source': 'ytmusicapi'
+            }
+                
+        except Exception as e:
+            logger.error(f"Error getting recommendations for video ID {video_id}: {str(e)}")
+            import traceback
+            logger.error(traceback.format_exc())
             return None
     
     def get_youtube_homepage_data(self, max_results=20):
@@ -571,80 +620,3 @@ class MusicExtractor:
         except Exception as e:
             logger.error(f"Error in fallback homepage data: {str(e)}")
             return None
-    
-    def get_category_videos(self, category="music", max_results=20):
-        """Get videos by category using ytmusicapi for speed"""
-        try:
-            if not self.ytmusic:
-                logger.warning("YTMusic API not available, falling back to yt-dlp")
-                return self._get_category_videos_fallback(category, max_results)
-            
-            # Map categories to YTMusic search terms
-            category_queries = {
-                'music': 'music',
-                'pop': 'pop music',
-                'rock': 'rock music',
-                'hip_hop': 'hip hop',
-                'electronic': 'electronic music',
-                'indie': 'indie music',
-                'classical': 'classical music',
-                'jazz': 'jazz music',
-                'country': 'country music',
-                'r&b': 'r&b music'
-            }
-            
-            query = category_queries.get(category.lower(), f"{category} music")
-            
-            # Use YTMusic search for fast results
-            search_results = self.ytmusic.search(query, filter="songs", limit=max_results)
-            
-            videos = []
-            for result in search_results:
-                video_info = self._convert_ytmusic_to_standard(result)
-                if video_info:
-                    video_info['category'] = category
-                    videos.append(video_info)
-            
-            return videos
-            
-        except Exception as e:
-            logger.error(f"Error getting category videos with YTMusic: {str(e)}")
-            return self._get_category_videos_fallback(category, max_results)
-    
-    def _get_category_videos_fallback(self, category="music", max_results=20):
-        """Fallback method using yt-dlp for category videos"""
-        try:
-            category_queries = {
-                'music': 'latest music videos',
-                'pop': 'pop music hits',
-                'rock': 'rock music songs',
-                'hip_hop': 'hip hop rap music',
-                'electronic': 'electronic dance music',
-                'indie': 'indie alternative music',
-                'classical': 'classical music',
-                'jazz': 'jazz music',
-                'country': 'country music',
-                'r&b': 'r&b soul music'
-            }
-            
-            query = category_queries.get(category.lower(), f"{category} music")
-            search_query = f"ytsearch{max_results}:{query}"
-            
-            with yt_dlp.YoutubeDL(self.ydl_opts) as ydl:
-                search_results = ydl.extract_info(search_query, download=False)
-                
-                if not search_results or 'entries' not in search_results:
-                    return []
-                
-                videos = []
-                for entry in search_results['entries']:
-                    if entry:
-                        video_info = self.extract_song_metadata(entry)
-                        video_info['category'] = category
-                        videos.append(video_info)
-                
-                return videos
-                
-        except Exception as e:
-            logger.error(f"Error getting category videos fallback: {str(e)}")
-            return []

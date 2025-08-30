@@ -33,22 +33,19 @@ def home():
         'version': '1.0.0',
         'endpoints': {
             '/search': 'Search for songs (GET) - ?q=query&limit=10',
-            '/song/<song_id>': 'Get specific song details (GET)',
             '/audio/<video_id>': 'Get audio URL for video ID (GET)',
-            '/extract': 'Extract song from URL (POST)',
-            '/playlist': 'Extract songs from playlist (POST)',
+            '/recommended/<video_id>': 'Get recommended songs for a video ID (GET) - ?limit=50',
+            '/trending/<country_code>': 'Get trending playlists by country code (GET) - ?limit=50',
             '/homepage': 'Get YouTube homepage/trending data (GET) - ?limit=20',
-            '/category/<category>': 'Get videos by category (GET) - ?limit=20',
             '/health': 'Health check (GET)'
         },
         'example_usage': {
             'search': '/search?q=imagine%20dragons&limit=5',
-            'song': '/song/dQw4w9WgXcQ',
             'audio': '/audio/dQw4w9WgXcQ',
-            'extract': 'POST /extract with {"url": "https://youtube.com/watch?v=..."}',
-            'playlist': 'POST /playlist with {"url": "https://youtube.com/playlist?list=..."}',
-            'homepage': '/homepage?limit=20',
-            'category': '/category/pop?limit=15'
+            'playlist_id': '/playlist/PLiJ19Xxebz3nkJ7Rg1vgHzu-nSLmSig7t?limit=20',
+            'recommended': '/recommended/dQw4w9WgXcQ?limit=20',
+            'trending': '/trending/IN?limit=50 (country codes: US, IN, GB, etc.)',
+            'homepage': '/homepage?limit=20'
         },
         'performance_note': 'Search and homepage endpoints use YTMusic API for fast metadata. Use /audio/<video_id> to get playable URLs on demand.'
     })
@@ -77,26 +74,6 @@ def search_songs():
         logger.error(f"Search error: {str(e)}")
         return jsonify({'error': 'Internal server error during search'}), 500
 
-@app.route('/song/<song_id>', methods=['GET'])
-def get_song(song_id):
-    """Get specific song details by ID"""
-    try:
-        # Construct YouTube URL from ID
-        url = f"https://www.youtube.com/watch?v={song_id}"
-        song_details = music_extractor.get_song_details(url)
-        
-        if song_details:
-            return jsonify({
-                'success': True,
-                'song': song_details
-            })
-        else:
-            return jsonify({'error': 'Song not found'}), 404
-            
-    except Exception as e:
-        logger.error(f"Get song error: {str(e)}")
-        return jsonify({'error': 'Internal server error'}), 500
-
 @app.route('/audio/<video_id>', methods=['GET'])
 def get_audio_url(video_id):
     """Get audio URL for a specific video ID"""
@@ -116,66 +93,6 @@ def get_audio_url(video_id):
     except Exception as e:
         logger.error(f"Get audio URL error: {str(e)}")
         return jsonify({'error': 'Internal server error'}), 500
-
-@app.route('/extract', methods=['POST'])
-def extract_from_url():
-    """Extract song details from a given URL"""
-    data = request.get_json()
-    
-    if not data or 'url' not in data:
-        return jsonify({'error': 'URL is required in request body'}), 400
-    
-    url = data['url'].strip()
-    
-    if not url:
-        return jsonify({'error': 'URL cannot be empty'}), 400
-    
-    try:
-        song_details = music_extractor.get_song_details(url)
-        
-        if song_details:
-            return jsonify({
-                'success': True,
-                'song': song_details
-            })
-        else:
-            return jsonify({'error': 'Could not extract song details from URL'}), 400
-            
-    except Exception as e:
-        logger.error(f"Extract error: {str(e)}")
-        return jsonify({'error': 'Internal server error during extraction'}), 500
-
-@app.route('/playlist', methods=['POST'])
-def get_playlist():
-    """Extract songs from a playlist"""
-    data = request.get_json()
-    
-    if not data or 'url' not in data:
-        return jsonify({'error': 'Playlist URL is required in request body'}), 400
-    
-    url = data['url'].strip()
-    max_results = data.get('limit', 50)
-    
-    if not url:
-        return jsonify({'error': 'URL cannot be empty'}), 400
-    
-    if max_results > Config.MAX_SEARCH_RESULTS:
-        max_results = Config.MAX_SEARCH_RESULTS
-    
-    try:
-        playlist_info = music_extractor.get_playlist_info(url, max_results)
-        
-        if playlist_info:
-            return jsonify({
-                'success': True,
-                'playlist': playlist_info
-            })
-        else:
-            return jsonify({'error': 'Could not extract playlist information'}), 400
-            
-    except Exception as e:
-        logger.error(f"Playlist extraction error: {str(e)}")
-        return jsonify({'error': 'Internal server error during playlist extraction'}), 500
 
 @app.route('/homepage', methods=['GET'])
 def get_homepage_data():
@@ -200,28 +117,6 @@ def get_homepage_data():
     except Exception as e:
         logger.error(f"Homepage data error: {str(e)}")
         return jsonify({'error': 'Internal server error while fetching homepage data'}), 500
-
-@app.route('/category/<category>', methods=['GET'])
-def get_category_data(category):
-    """Get videos by category"""
-    max_results = request.args.get('limit', 20, type=int)
-    
-    if max_results > Config.MAX_SEARCH_RESULTS:
-        max_results = Config.MAX_SEARCH_RESULTS
-    
-    try:
-        category_videos = music_extractor.get_category_videos(category, max_results)
-        
-        return jsonify({
-            'success': True,
-            'category': category,
-            'results_count': len(category_videos),
-            'videos': category_videos
-        })
-            
-    except Exception as e:
-        logger.error(f"Category data error: {str(e)}")
-        return jsonify({'error': 'Internal server error while fetching category data'}), 500
 
 @app.route('/health', methods=['GET'])
 def health_check():
@@ -251,6 +146,108 @@ def health_check():
             'status': 'unhealthy',
             'timestamp': str(datetime.now()),
             'error': str(e)
+        }), 500
+
+@app.route('/playlist/<playlist_id>', methods=['GET'])
+def get_ytmusic_playlist(playlist_id):
+    """Get playlist details by ID using YTMusic API"""
+    max_results = request.args.get('limit', 50, type=int)
+    
+    if max_results > Config.MAX_SEARCH_RESULTS:
+        max_results = Config.MAX_SEARCH_RESULTS
+    
+    try:
+        # Check if the input is a URL and extract playlist ID if so
+        if playlist_id.startswith('http'):
+            extracted_id = music_extractor._extract_playlist_id_from_url(playlist_id)
+            if not extracted_id:
+                return jsonify({'error': 'Invalid playlist URL'}), 400
+            playlist_id = extracted_id
+        
+        # Get playlist data using YTMusic API
+        playlist_info = music_extractor.get_ytmusic_playlist(playlist_id, max_results)
+        
+        if playlist_info:
+            return jsonify({
+                'success': True,
+                'playlist': playlist_info
+            })
+        else:
+            return jsonify({'error': 'Could not extract playlist information'}), 400
+            
+    except Exception as e:
+        logger.error(f"YTMusic playlist extraction error: {str(e)}")
+        return jsonify({'error': 'Internal server error during playlist extraction'}), 500
+
+@app.route('/trending/<country_code>', methods=['GET'])
+def get_trending_by_country(country_code):
+    """Get trending playlists by country code using YTMusic API"""
+    max_results = request.args.get('limit', 50, type=int)
+    
+    if max_results > Config.MAX_SEARCH_RESULTS:
+        max_results = Config.MAX_SEARCH_RESULTS
+    
+    # Convert to uppercase
+    country_code = country_code.upper()
+    
+    try:
+        # Get trending playlists by country
+        trending_data = music_extractor.get_trending_by_country(country_code, max_results)
+        
+        if trending_data and trending_data.get('trending_playlists'):
+            return jsonify({
+                'success': True,
+                'country': country_code,
+                'total_playlists': trending_data.get('total_playlists', 0),
+                'playlists': trending_data.get('trending_playlists', []),
+                'message': f'Found {len(trending_data.get("trending_playlists", []))} trending playlists'
+            })
+        else:
+            # Provide a helpful message if no playlists are returned
+            return jsonify({
+                'success': False,
+                'error': f'Could not fetch trending playlists for country code: {country_code}',
+                'message': 'No playlists found. This might be due to regional restrictions or API limitations.'
+            }), 400
+            
+    except Exception as e:
+        logger.error(f"YTMusic trending extraction error: {str(e)}")
+        return jsonify({
+            'success': False,
+            'error': 'Internal server error during trending data extraction',
+            'message': 'Try using a different country code or try again later.'
+        }), 500
+
+@app.route('/recommended/<video_id>', methods=['GET'])
+def get_recommended_songs(video_id):
+    """Get recommended songs for a specific video ID using YTMusic API"""
+    max_results = request.args.get('limit', 50, type=int)
+    
+    if max_results > Config.MAX_SEARCH_RESULTS:
+        max_results = Config.MAX_SEARCH_RESULTS
+    
+    try:
+        # Get recommended songs using YTMusic API
+        recommended_data = music_extractor.get_recommended_songs(video_id, max_results)
+        
+        if recommended_data:
+            return jsonify({
+                'success': True,
+                'recommendations': recommended_data
+            })
+        else:
+            return jsonify({
+                'success': False,
+                'error': f'Could not fetch recommendations for video ID: {video_id}',
+                'message': 'Ensure you are providing a valid YouTube video ID'
+            }), 400
+            
+    except Exception as e:
+        logger.error(f"YTMusic recommendations error: {str(e)}")
+        return jsonify({
+            'success': False,
+            'error': 'Internal server error while fetching recommendations',
+            'message': 'Try again later or check if the video ID is valid'
         }), 500
 
 @app.errorhandler(404)
