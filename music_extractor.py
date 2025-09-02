@@ -282,41 +282,39 @@ class MusicExtractor:
         """Format duration from seconds to MM:SS or HH:MM:SS"""
         if not duration:
             return "Unknown"
-        
         try:
             duration = int(duration)
             hours = duration // 3600
             minutes = (duration % 3600) // 60
             seconds = duration % 60
-            
             if hours > 0:
                 return f"{hours:02d}:{minutes:02d}:{seconds:02d}"
             else:
                 return f"{minutes:02d}:{seconds:02d}"
-        except Exception:
+        except (ValueError, TypeError):
             return "Unknown"
-    
+
     def _get_high_quality_thumbnail(self, thumbnails):
         """Get the highest quality thumbnail from the thumbnails list, and enhance if possible"""
         if not thumbnails:
             return None
             
         # Get the highest resolution thumbnail available
-        thumbnail = thumbnails[-1].get('url') if isinstance(thumbnails, list) and thumbnails else None
-        
-        # Try to enhance quality by modifying URL if it's from i.ytimg.com
-        if thumbnail and 'i.ytimg.com/vi/' in thumbnail:
-            try:
-                video_id_in_url = thumbnail.split('/vi/')[1].split('/')[0]
-                # Force maxresdefault for highest quality
-                thumbnail = f"https://i.ytimg.com/vi/{video_id_in_url}/maxresdefault.jpg"
-            except Exception:
-                # If URL manipulation fails, keep the original URL
-                pass
-                
-        return thumbnail
-        except (ValueError, TypeError):
-            return "Unknown"
+        try:
+            thumbnail = thumbnails[-1].get('url') if isinstance(thumbnails, list) and thumbnails else None
+            
+            # Try to enhance quality by modifying URL if it's from i.ytimg.com
+            if thumbnail and 'i.ytimg.com/vi/' in thumbnail:
+                try:
+                    video_id_in_url = thumbnail.split('/vi/')[1].split('/')[0]
+                    # Force maxresdefault for highest quality
+                    thumbnail = f"https://i.ytimg.com/vi/{video_id_in_url}/maxresdefault.jpg"
+                except Exception:
+                    # If URL manipulation fails, keep the original URL
+                    pass
+            return thumbnail
+        except (ValueError, TypeError, IndexError):
+            return None
     
     def get_playlist_info(self, playlist_url, max_results=50):
         """Extract songs from a playlist using yt-dlp"""
