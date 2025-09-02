@@ -154,9 +154,19 @@ class MusicExtractor:
             duration_text = ytmusic_result.get('duration_seconds')
             duration = int(duration_text) if duration_text else None
             
-            # Get thumbnail
+            # Get thumbnail with highest possible quality
             thumbnails = ytmusic_result.get('thumbnails', [])
-            thumbnail = thumbnails[-1]['url'] if thumbnails else None
+            thumbnail = None
+            
+            if thumbnails:
+                # Get the highest quality thumbnail available
+                thumbnail = thumbnails[-1]['url'] if thumbnails else None
+                
+                # Try to enhance quality by modifying URL if it's from i.ytimg.com
+                if thumbnail and 'i.ytimg.com/vi/' in thumbnail:
+                    video_id_in_url = thumbnail.split('/vi/')[1].split('/')[0]
+                    # Force maxresdefault for highest quality
+                    thumbnail = f"https://i.ytimg.com/vi/{video_id_in_url}/maxresdefault.jpg"
             
             return {
                 'id': video_id,
@@ -283,6 +293,28 @@ class MusicExtractor:
                 return f"{hours:02d}:{minutes:02d}:{seconds:02d}"
             else:
                 return f"{minutes:02d}:{seconds:02d}"
+        except Exception:
+            return "Unknown"
+    
+    def _get_high_quality_thumbnail(self, thumbnails):
+        """Get the highest quality thumbnail from the thumbnails list, and enhance if possible"""
+        if not thumbnails:
+            return None
+            
+        # Get the highest resolution thumbnail available
+        thumbnail = thumbnails[-1].get('url') if isinstance(thumbnails, list) and thumbnails else None
+        
+        # Try to enhance quality by modifying URL if it's from i.ytimg.com
+        if thumbnail and 'i.ytimg.com/vi/' in thumbnail:
+            try:
+                video_id_in_url = thumbnail.split('/vi/')[1].split('/')[0]
+                # Force maxresdefault for highest quality
+                thumbnail = f"https://i.ytimg.com/vi/{video_id_in_url}/maxresdefault.jpg"
+            except Exception:
+                # If URL manipulation fails, keep the original URL
+                pass
+                
+        return thumbnail
         except (ValueError, TypeError):
             return "Unknown"
     
@@ -345,7 +377,7 @@ class MusicExtractor:
                 'id': playlist_id,
                 'uploader': playlist_data.get('author', {}).get('name', 'Unknown'),
                 'description': playlist_data.get('description', ''),
-                'thumbnail': playlist_data.get('thumbnails', [{}])[-1].get('url') if playlist_data.get('thumbnails') else None,
+                'thumbnail': self._get_high_quality_thumbnail(playlist_data.get('thumbnails')),
                 'year': playlist_data.get('year'),
                 'total_tracks': playlist_data.get('trackCount', len(songs)),
                 'entry_count': len(songs),
@@ -388,7 +420,7 @@ class MusicExtractor:
                             playlist_info = {
                                 'title': item.get('title', 'Unknown Playlist'),
                                 'playlistId': item.get('playlistId'),
-                                'thumbnail': item.get('thumbnails', [{}])[-1].get('url') if item.get('thumbnails') else None,
+                                'thumbnail': self._get_high_quality_thumbnail(item.get('thumbnails')),
                                 'description': item.get('description', ''),
                                 'section': section_title,
                                 'url': f"https://music.youtube.com/playlist?list={item.get('playlistId')}" if item.get('playlistId') else None
@@ -424,7 +456,7 @@ class MusicExtractor:
                                     playlist_info = {
                                         'title': result.get('title', 'Unknown Playlist'),
                                         'playlistId': result.get('browseId', '').replace('VL', '') if result.get('browseId', '').startswith('VL') else result.get('browseId'),
-                                        'thumbnail': result.get('thumbnails', [{}])[-1].get('url') if result.get('thumbnails') else None,
+                                        'thumbnail': self._get_high_quality_thumbnail(result.get('thumbnails')),
                                         'description': result.get('description', ''),
                                         'author': result.get('author', 'Unknown'),
                                         'videoCount': result.get('count'),
