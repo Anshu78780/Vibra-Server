@@ -1,0 +1,38 @@
+[
+  {
+    "name": "APISID",
+    "value": "k9Z02VJ9up245k6l/ARpI92bVuchUJXiWB"
+  },
+  {
+    "name": "SAPISID",
+    "value": "reUlloFbiSrqzzHI/Awok8HDypcBiDJrZ-"
+  },
+  {
+    "name": "__Secure-1PAPISID",
+    "value": "reUlloFbiSrqzzHI/Awok8HDypcBiDJrZ-"
+  },
+  {
+    "name": "__Secure-3PAPISID",
+    "value": "reUlloFbiSrqzzHI/Awok8HDypcBiDJrZ-"
+  },
+  {
+    "name": "SID",
+    "value": "g.a0000wh6pWxmdNlTZ_f9uuhwufxHzYIp4FZwg8secKBfdyjo5ffdl5vXhtocZ7nVBlqyjZ0UqAACgYKARoSARQSFQHGX2MiHFnibM3Zj9-356mgYBNkfBoVAUF8yKog1Y64_rFjCCdeklvPc5Hk0076"
+  },
+  {
+    "name": "_gcl_au",
+    "value": "1.1.811766880.1756525033"
+  },
+  {
+    "name": "PREF",
+    "value": "f4=4000000&f6=40000000&tz=Asia.Calcutta&f7=100&repeat=NONE"
+  },
+  {
+    "name": "CONSISTENCY",
+    "value": "AKreu9tsAM-0DCwQ7JxCySx0YkfEVWw9W651vpXpCNV-9AatNiLhSb1oNOOQDGwFV3PGLp5YDQ-dWJI7FUBZ94peDpeiZO_aHKwA4jsPrMaS7SdOukC-xrk0lj4cVzlDv--RTx1nY4gzNGuk86aW7BcM"
+  },
+  {
+    "name": "SIDCC",
+    "value": "AKEyXzUEtRS-Rjm4411a_CToFuxQhBvcQum2qgsuCkTNTO_Gf3kI_JnI07unCuTQZId_JxFVDQ"
+  }
+]

@@ -95,7 +95,54 @@ GET /audio/ktvTqknDobU
 }
 ```
 
-### 3. Homepage Data
+### 3. Extract with yt-dlp
+**GET** `/ytdlp`
+
+Extract detailed song data using yt-dlp with cookie authentication.
+
+**Parameters:**
+- `url` (string, required): YouTube video URL
+
+**Example Request:**
+```http
+GET /ytdlp?url=https://www.youtube.com/watch?v=ktvTqknDobU
+```
+
+**Example Response:**
+```json
+{
+  "success": true,
+  "url": "https://www.youtube.com/watch?v=ktvTqknDobU",
+  "song_data": {
+    "id": "ktvTqknDobU",
+    "title": "Radioactive",
+    "artist": "Imagine Dragons",
+    "duration": 187,
+    "duration_string": "03:07",
+    "thumbnail": "https://i.ytimg.com/vi/ktvTqknDobU/maxresdefault.jpg",
+    "poster_image": "https://i.ytimg.com/vi/ktvTqknDobU/maxresdefault.jpg",
+    "audio_url": "https://example.com/audio.mp3",
+    "audio_formats": [
+      {
+        "format_id": "251",
+        "ext": "webm",
+        "acodec": "opus",
+        "abr": 160,
+        "asr": 48000,
+        "filesize": 3012345,
+        "url": "https://example.com/audio-format-1.webm"
+      }
+    ],
+    "webpage_url": "https://www.youtube.com/watch?v=ktvTqknDobU",
+    "view_count": 1234567890,
+    "uploader": "Imagine Dragons",
+    "source": "yt-dlp"
+  },
+  "message": "Song data extracted successfully with cookie authentication"
+}
+```
+
+### 4. Homepage Data
 **GET** `/homepage`
 
 Get trending music from YouTube Music homepage.

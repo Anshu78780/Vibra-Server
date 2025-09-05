@@ -34,6 +34,7 @@ def home():
         'endpoints': {
             '/search': 'Search for songs (GET) - ?q=query&limit=10',
             '/audio/<video_id>': 'Get audio URL for video ID (GET)',
+            '/ytdlp': 'Extract song data using yt-dlp with cookie authentication (GET) - ?url=video_url',
             '/recommended/<video_id>': 'Get recommended songs for a video ID (GET) - ?limit=50',
             '/trending/<country_code>': 'Get trending playlists by country code (GET) - ?limit=50',
             '/homepage': 'Get YouTube homepage/trending data (GET) - ?limit=20',
@@ -42,6 +43,7 @@ def home():
         'example_usage': {
             'search': '/search?q=imagine%20dragons&limit=5',
             'audio': '/audio/dQw4w9WgXcQ',
+            'ytdlp': '/ytdlp?url=https://www.youtube.com/watch?v=dQw4w9WgXcQ',
             'playlist_id': '/playlist/PLiJ19Xxebz3nkJ7Rg1vgHzu-nSLmSig7t?limit=20',
             'recommended': '/recommended/dQw4w9WgXcQ?limit=20',
             'trending': '/trending/IN?limit=50 (country codes: US, IN, GB, etc.)',
@@ -93,6 +95,40 @@ def get_audio_url(video_id):
     except Exception as e:
         logger.error(f"Get audio URL error: {str(e)}")
         return jsonify({'error': 'Internal server error'}), 500
+
+@app.route('/ytdlp', methods=['GET'])
+def extract_with_ytdlp():
+    """Extract song data using yt-dlp with cookie authentication"""
+    url = request.args.get('url', '').strip()
+    
+    if not url:
+        return jsonify({'error': 'URL parameter is required'}), 400
+    
+    try:
+        # Extract song data with yt-dlp and cookie authentication
+        song_data = music_extractor.extract_with_ytdlp(url)
+        
+        if song_data:
+            return jsonify({
+                'success': True,
+                'url': url,
+                'song_data': song_data,
+                'message': 'Song data extracted successfully with cookie authentication'
+            })
+        else:
+            return jsonify({
+                'success': False,
+                'error': 'Could not extract song data from the provided URL',
+                'message': 'Make sure the URL is valid and the video is accessible'
+            }), 404
+            
+    except Exception as e:
+        logger.error(f"yt-dlp extraction error: {str(e)}")
+        return jsonify({
+            'success': False,
+            'error': 'Internal server error during song extraction',
+            'message': str(e)
+        }), 500
 
 @app.route('/homepage', methods=['GET'])
 def get_homepage_data():

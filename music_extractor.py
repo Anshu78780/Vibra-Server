@@ -61,32 +61,66 @@ class MusicExtractor:
     def _setup_cookies(self):
         """Set up cookies for YouTube authentication to avoid bot detection"""
         try:
-            # Get cookies from environment variable (for Render deployment)
-            cookies_string = os.environ.get('YOUTUBE_COOKIES')
+            # First, check if cookie.txt exists in the project directory
+            original_cookie_file = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'cookie.txt')
             
-            if cookies_string:
-                # Create a temporary cookie file
+            if os.path.exists(original_cookie_file):
+                # Create a temporary cookie file in Netscape format
                 temp_dir = tempfile.gettempdir()
-                cookie_file = os.path.join(temp_dir, 'youtube_cookies.txt')
+                netscape_cookie_file = os.path.join(temp_dir, 'youtube_cookies_netscape.txt')
                 
-                # Write cookies in Netscape format
-                with open(cookie_file, 'w') as f:
-                    f.write("# Netscape HTTP Cookie File\n")
-                    f.write("# This is a generated file! Do not edit.\n\n")
+                # Convert JSON cookie format to Netscape format
+                try:
+                    import json
+                    with open(original_cookie_file, 'r') as f:
+                        cookies_json = json.load(f)
                     
-                    # Parse the cookie string and convert to Netscape format
-                    for cookie in cookies_string.split('; '):
-                        if '=' in cookie:
-                            name, value = cookie.split('=', 1)
-                            # Write in Netscape format: domain, domain_specified, path, secure, expiration, name, value
-                            f.write(f".youtube.com\tTRUE\t/\tFALSE\t0\t{name}\t{value}\n")
-                
-                # Update ydl_opts to use the cookie file
-                self.ydl_opts['cookiefile'] = cookie_file
-                logger.info("YouTube cookies loaded successfully")
+                    # Write in Netscape format
+                    with open(netscape_cookie_file, 'w') as f:
+                        f.write("# Netscape HTTP Cookie File\n")
+                        f.write("# This is a generated file! Do not edit.\n\n")
+                        
+                        for cookie in cookies_json:
+                            name = cookie.get('name', '')
+                            value = cookie.get('value', '')
+                            domain = '.youtube.com'
+                            
+                            if name and value:
+                                # domain, flag, path, secure, expiry, name, value
+                                f.write(f"{domain}\tTRUE\t/\tFALSE\t0\t{name}\t{value}\n")
+                    
+                    # Update ydl_opts to use the Netscape format cookie file
+                    self.ydl_opts['cookiefile'] = netscape_cookie_file
+                    logger.info(f"Converted JSON cookies to Netscape format for yt-dlp")
+                except Exception as e:
+                    logger.error(f"Failed to convert cookies to Netscape format: {str(e)}")
             else:
-                logger.info("No YouTube cookies found in environment variables")
+                # Fallback to environment variable (for Render deployment)
+                cookies_string = os.environ.get('YOUTUBE_COOKIES')
                 
+                if cookies_string:
+                    # Create a temporary cookie file
+                    temp_dir = tempfile.gettempdir()
+                    cookie_file = os.path.join(temp_dir, 'youtube_cookies.txt')
+                    
+                    # Write cookies in Netscape format
+                    with open(cookie_file, 'w') as f:
+                        f.write("# Netscape HTTP Cookie File\n")
+                        f.write("# This is a generated file! Do not edit.\n\n")
+                        
+                        # Parse the cookie string and convert to Netscape format
+                        for cookie in cookies_string.split('; '):
+                            if '=' in cookie:
+                                name, value = cookie.split('=', 1)
+                                # Write in Netscape format: domain, domain_specified, path, secure, expiration, name, value
+                                f.write(f".youtube.com\tTRUE\t/\tFALSE\t0\t{name}\t{value}\n")
+                    
+                    # Update ydl_opts to use the cookie file
+                    self.ydl_opts['cookiefile'] = cookie_file
+                    logger.info("YouTube cookies loaded from environment variable")
+                else:
+                    logger.info("No YouTube cookies found in file or environment variables")
+                    
         except Exception as e:
             logger.warning(f"Failed to set up cookies: {str(e)}")
     
@@ -234,18 +268,113 @@ class MusicExtractor:
                         audio_url = audio_formats[0]['url']
                 
                 return audio_url
+        except Exception as e:
+            logger.error(f"Error getting audio URL: {str(e)}")
+            return None
+                
+    def extract_with_ytdlp(self, url):
+        """Extract song data using yt-dlp with cookie authentication"""
+        try:
+            # Ensure we're using the latest cookie file
+            self._setup_cookies()
+            
+            with yt_dlp.YoutubeDL(self.ydl_opts) as ydl:
+                info = ydl.extract_info(url, download=False)
+                
+                if not info:
+                    return None
+                
+                # Process the info to get song metadata and audio URL
+                song_data = self.extract_song_metadata(info)
+                
+                # Get formats
+                formats = info.get('formats', [])
+                audio_formats = [f for f in formats if f.get('acodec') != 'none' and f.get('vcodec') == 'none']
+                
+                if audio_formats:
+                    # Sort by quality (based on bitrate)
+                    audio_formats.sort(key=lambda x: x.get('abr', 0), reverse=True)
+                    song_data['audio_url'] = audio_formats[0].get('url')
+                    song_data['audio_formats'] = [
+                        {
+                            'format_id': f.get('format_id'),
+                            'ext': f.get('ext'),
+                            'acodec': f.get('acodec'),
+                            'abr': f.get('abr'),
+                            'asr': f.get('asr'),
+                            'filesize': f.get('filesize'),
+                            'url': f.get('url')
+                        }
+                        for f in audio_formats[:3]  # Include top 3 audio formats
+                    ]
+                
+                return song_data
                 
         except Exception as e:
-            logger.error(f"Error getting audio URL for {video_id}: {str(e)}")
-            
-            # Try fallback method if bot detection occurs
-            if "Sign in to confirm" in str(e) or "bot" in str(e).lower():
-                return self._get_audio_url_fallback(video_id)
-                
+            logger.error(f"Error extracting with yt-dlp: {str(e)}")
             return None
     
     def _get_audio_url_fallback(self, video_id):
         """Fallback method for audio URL extraction when bot detection occurs"""
+        
+    def extract_song_metadata(self, info):
+        """Extract song metadata from yt-dlp info"""
+        try:
+            # Get basic information
+            video_id = info.get('id')
+            title = info.get('title', 'Unknown Title')
+            
+            # Get artist information
+            artist = info.get('artist', info.get('uploader', 'Unknown Artist'))
+            
+            # Get album information
+            album = info.get('album', info.get('playlist_title', None))
+            
+            # Get duration
+            duration_seconds = info.get('duration')
+            duration_string = self.format_duration(duration_seconds) if duration_seconds else "Unknown"
+            
+            # Get thumbnail
+            thumbnails = info.get('thumbnails', [])
+            thumbnail = thumbnails[-1]['url'] if thumbnails else None
+            
+            # Force maxresdefault for highest quality if possible
+            if thumbnail and 'i.ytimg.com/vi/' in thumbnail:
+                thumbnail = f"https://i.ytimg.com/vi/{video_id}/maxresdefault.jpg"
+            
+            # Build song metadata
+            song_metadata = {
+                'id': video_id,
+                'title': title,
+                'artist': artist,
+                'album': album,
+                'duration': duration_seconds,
+                'duration_string': duration_string,
+                'thumbnail': thumbnail,
+                'poster_image': thumbnail,
+                'audio_url': None,  # Will be set later
+                'webpage_url': info.get('webpage_url', f"https://www.youtube.com/watch?v={video_id}"),
+                'view_count': info.get('view_count'),
+                'like_count': info.get('like_count'),
+                'uploader': info.get('uploader'),
+                'upload_date': info.get('upload_date'),
+                'description': info.get('description', ''),
+                'extractor': info.get('extractor'),
+                'availability': info.get('availability', 'public'),
+                'live_status': info.get('live_status', 'not_live'),
+                'source': 'yt-dlp'
+            }
+            
+            return song_metadata
+            
+        except Exception as e:
+            logger.error(f"Error extracting song metadata: {str(e)}")
+            return {
+                'id': info.get('id', 'unknown'),
+                'title': info.get('title', 'Unknown Title'),
+                'error': str(e),
+                'source': 'yt-dlp'
+            }
         try:
             logger.info(f"Attempting fallback audio extraction for {video_id}...")
             url = f"https://www.youtube.com/watch?v={video_id}"
